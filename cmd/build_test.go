@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"io/fs"
 	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 
@@ -33,7 +35,19 @@ func TestBuildInvalidConfig(t *testing.T) {
 }
 
 func TestBuildBrokenProject(t *testing.T) {
-	setup(t)
+	folder := setup(t)
+	t.Cleanup(func() {
+		filepath.Walk(folder, func(path string, info fs.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
+				return nil
+			}
+			t.Log("removing", path)
+			return os.Remove(path)
+		})
+	})
 	createFile(t, "main.go", "not a valid go file")
 	cmd := newBuildCmd()
 	cmd.cmd.SetArgs([]string{"--snapshot", "--timeout=1m", "--parallelism=2"})

@@ -203,6 +203,10 @@ func TestInvalidAlgorithm(t *testing.T) {
 	require.Empty(t, sum)
 }
 
+func TestCleanup(t *testing.T)  {
+	t.Log(t.TempDir())
+}
+
 func TestExtraOr(t *testing.T) {
 	a := &Artifact{
 		Extra: map[string]interface{}{

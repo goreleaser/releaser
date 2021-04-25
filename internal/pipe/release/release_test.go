@@ -220,6 +220,7 @@ func TestRunPipeUploadFailure(t *testing.T) {
 	folder := t.TempDir()
 	tarfile, err := os.Create(filepath.Join(folder, "bin.tar.gz"))
 	require.NoError(t, err)
+	require.NoError(t, tarfile.Close())
 	config := config.Project{
 		Release: config.Release{
 			GitHub: config.Repo{
@@ -291,6 +292,7 @@ func TestRunPipeUploadRetry(t *testing.T) {
 	folder := t.TempDir()
 	tarfile, err := os.Create(filepath.Join(folder, "bin.tar.gz"))
 	require.NoError(t, err)
+	require.NoError(t, tarfile.Close())
 	config := config.Project{
 		Release: config.Release{
 			GitHub: config.Repo{

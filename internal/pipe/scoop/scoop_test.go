@@ -752,7 +752,7 @@ func Test_buildManifest(t *testing.T) {
 		ctx      *context.Context
 	}{
 		{
-			"testdata/test_buildmanifest.json.golden",
+			filepath.Join("testdata", "test_buildmanifest.json.golden"),
 			&context.Context{
 				Context:   ctx.Background(),
 				TokenType: context.TokenTypeGitHub,
@@ -789,7 +789,7 @@ func Test_buildManifest(t *testing.T) {
 			},
 		},
 		{
-			"testdata/test_buildmanifest_pre_post_install.json.golden",
+			filepath.Join("testdata", "test_buildmanifest_pre_post_install.json.golden"),
 			&context.Context{
 				Context:   ctx.Background(),
 				TokenType: context.TokenTypeGitHub,
@@ -828,7 +828,7 @@ func Test_buildManifest(t *testing.T) {
 			},
 		},
 		{
-			"testdata/test_buildmanifest_url_template.json.golden",
+			filepath.Join("testdata", "test_buildmanifest_url_template.json.golden"),
 			&context.Context{
 				Context:   ctx.Background(),
 				TokenType: context.TokenTypeGitHub,
@@ -870,7 +870,7 @@ func Test_buildManifest(t *testing.T) {
 			},
 		},
 		{
-			"testdata/test_buildmanifest_gitlab_url_template.json.golden",
+			filepath.Join("testdata", "test_buildmanifest_gitlab_url_template.json.golden"),
 			&context.Context{
 				Context:   ctx.Background(),
 				TokenType: context.TokenTypeGitLab,
@@ -1060,7 +1060,7 @@ func TestWrapInDirectory(t *testing.T) {
 	out, err := doBuildManifest(mf)
 	require.NoError(t, err)
 
-	var golden = "testdata/test_buildmanifest_wrap.json.golden"
+	var golden = filepath.Join("testdata", "test_buildmanifest_wrap.json.golden")
 	if *update {
 		require.NoError(t, os.WriteFile(golden, out.Bytes(), 0655))
 	}

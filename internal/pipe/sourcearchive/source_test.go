@@ -43,7 +43,7 @@ func TestArchive(t *testing.T) {
 			require.Equal(t, artifact.Artifact{
 				Type: artifact.UploadableSourceArchive,
 				Name: "foo-1.0.0." + format,
-				Path: "dist/foo-1.0.0." + format,
+				Path: filepath.Join("dist", "foo-1.0.0." + format),
 				Extra: map[string]interface{}{
 					"Format": format,
 				},
