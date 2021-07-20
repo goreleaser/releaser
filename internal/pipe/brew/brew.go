@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -199,9 +200,37 @@ func buildFormula(ctx *context.Context, brew config.Homebrew, client client.Clie
 }
 
 func fixDataDownloads(data templateData) templateData {
-	data.HasMacOSDownloads = data.MacOSAmd64.DownloadURL != "" || data.MacOSArm64.DownloadURL != ""
-	data.HasLinuxDownloads = data.LinuxAmd64.DownloadURL != "" || data.LinuxArm64.DownloadURL != "" || data.LinuxArm.DownloadURL != ""
+	data.HasMacOSDownloads = anyNonEmpty(data.MacOSAmd64.DownloadURL, data.MacOSArm64.DownloadURL)
+	data.HasLinuxDownloads = anyNonEmpty(data.LinuxAmd64.DownloadURL, data.LinuxArm64.DownloadURL, data.LinuxArm.DownloadURL)
+
+	data.MacOSArches = arches(map[string]string{
+		":x86_64":  data.MacOSAmd64.DownloadURL,
+		":aarch64": data.MacOSArm64.DownloadURL,
+	})
+
+	data.LinuxArches = arches(map[string]string{
+		":x86_64":  data.LinuxAmd64.DownloadURL,
+		":aarch64": data.LinuxArm64.DownloadURL,
+		":arm":     data.LinuxArm.DownloadURL,
+	})
 	return data
+}
+
+// returns true of any given string is not empty.
+func anyNonEmpty(ss ...string) bool {
+	return strings.Join(ss, "") != ""
+}
+
+// given an arch->url map, returns the arches that have a nonempty url.
+func arches(urls map[string]string) []string {
+	var ss []string
+	for k, v := range urls {
+		if v != "" {
+			ss = append(ss, k)
+		}
+	}
+	sort.Strings(ss)
+	return ss
 }
 
 func doBuildFormula(ctx *context.Context, data templateData) (string, error) {

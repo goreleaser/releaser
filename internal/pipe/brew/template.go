@@ -25,6 +25,8 @@ type templateData struct {
 	LinuxArm64        downloadable
 	HasMacOSDownloads bool
 	HasLinuxDownloads bool
+	MacOSArches       []string
+	LinuxArches       []string
 }
 
 type downloadable struct {
@@ -39,6 +41,36 @@ const formulaTemplate = `# typed: false
 {{ if .CustomRequire -}}
 require_relative "{{ .CustomRequire }}"
 {{ end -}}
+
+class SupportedArchRequirement < Requirement
+  fatal true
+
+  satisfy(build_env: false) { self.class.supported_arch? }
+
+  def message
+    "Your platform #{self.class.plat} is not supported by this tap. Supported arches: #{self.class.supported_arches.join ', '}."
+  end
+
+  def self.supported_arch?
+    self.supported_arches.include? self.plat
+  end
+
+  def self.supported_arches
+    return [{{ join .LinuxArches ", " }}] if OS.linux?
+    return [{{ join .MacOSArches ", " }}] if OS.mac?
+    []
+  end
+
+  def self.plat
+    case RUBY_PLATFORM
+    when /x86_64/ then :x86_64
+    when /arm/ then :arm
+    when /aarch64/ then :aarch64
+    else :dunno
+    end
+  end
+end
+
 class {{ .Name }} < Formula
   desc "{{ .Desc }}"
   homepage "{{ .Homepage }}"
@@ -53,6 +85,7 @@ class {{ .Name }} < Formula
   {{- if and (not .HasMacOSDownloads) .HasLinuxDownloads }}
   depends_on :linux
   {{- end }}
+  depends_on SupportedArchRequirement
   {{- printf "\n" }}
 
   {{- if .HasMacOSDownloads }}
