@@ -9,12 +9,13 @@ import (
 	"github.com/goreleaser/goreleaser/pkg/archive/targz"
 	"github.com/goreleaser/goreleaser/pkg/archive/tarxz"
 	"github.com/goreleaser/goreleaser/pkg/archive/zip"
+	"github.com/goreleaser/goreleaser/pkg/config"
 )
 
 // Archive represents a compression archive files from disk can be written to.
 type Archive interface {
 	Close() error
-	Add(name, path string) error
+	Add(f config.File) error
 }
 
 // New archive.

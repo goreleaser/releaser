@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/apex/log"
 	"github.com/goreleaser/nfpm/v2/files"
@@ -262,6 +263,44 @@ type FormatOverride struct {
 	Format string `yaml:",omitempty"`
 }
 
+// File is a file inside an archive.
+type File struct {
+	Source      string   `yaml:"src,omitempty"`
+	Destination string   `yaml:"dst,omitempty"`
+	StripParent bool     `yaml:"strip_parent,omitempty"`
+	Info        FileInfo `yaml:"info,omitempty"`
+}
+
+// FileInfo is the file info of a file.
+type FileInfo struct {
+	Owner string      `yaml:"owner,omitempty"`
+	Group string      `yaml:"group"`
+	Mode  os.FileMode `yaml:"mode,omitempty"`
+	MTime time.Time   `yaml:"mtime,omitempty"`
+}
+
+// type alias to prevent stack overflow
+type fileAlias File
+
+// UnmarshalYAML is a custom unmarshaler that wraps strings in arrays.
+func (f *File) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var str string
+	if err := unmarshal(&str); err == nil {
+		*f = File{
+			Source:      str,
+			Destination: str,
+		}
+		return nil
+	}
+
+	var file fileAlias
+	if err := unmarshal(&file); err != nil {
+		return err
+	}
+	*f = File(file)
+	return nil
+}
+
 // Archive config used for the archive.
 type Archive struct {
 	ID                        string            `yaml:",omitempty"`
@@ -271,7 +310,7 @@ type Archive struct {
 	Format                    string            `yaml:",omitempty"`
 	FormatOverrides           []FormatOverride  `yaml:"format_overrides,omitempty"`
 	WrapInDirectory           string            `yaml:"wrap_in_directory,omitempty"`
-	Files                     []string          `yaml:",omitempty"`
+	Files                     []File            `yaml:",omitempty"`
 	AllowDifferentBinaryCount bool              `yaml:"allow_different_binary_count"`
 }
 

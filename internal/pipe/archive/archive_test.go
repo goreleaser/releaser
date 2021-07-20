@@ -10,9 +10,11 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/goreleaser/goreleaser/internal/artifact"
 	"github.com/goreleaser/goreleaser/internal/testlib"
+	"github.com/goreleaser/goreleaser/internal/tmpl"
 	"github.com/goreleaser/goreleaser/pkg/archive"
 	"github.com/goreleaser/goreleaser/pkg/config"
 	"github.com/goreleaser/goreleaser/pkg/context"
@@ -60,9 +62,9 @@ func TestRunPipe(t *testing.T) {
 							ID:           "myid",
 							Builds:       []string{"default"},
 							NameTemplate: defaultNameTemplate,
-							Files: []string{
-								"README.{{.Os}}.*",
-								"./foo/**/*",
+							Files: []config.File{
+								{Source: "README.{{.Os}}.*"},
+								{Source: "./foo/**/*"},
 							},
 							FormatOverrides: []config.FormatOverride{
 								{
@@ -410,8 +412,8 @@ func TestRunPipeInvalidGlob(t *testing.T) {
 					Builds:       []string{"default"},
 					NameTemplate: "foo",
 					Format:       "zip",
-					Files: []string{
-						"[x-]",
+					Files: []config.File{
+						{Source: "[x-]"},
 					},
 				},
 			},
@@ -483,8 +485,8 @@ func TestRunPipeInvalidFilesNameTemplate(t *testing.T) {
 					Builds:       []string{"default"},
 					NameTemplate: "foo",
 					Format:       "zip",
-					Files: []string{
-						"{{.asdsd}",
+					Files: []config.File{
+						{Source: "{{.asdsd}"},
 					},
 				},
 			},
@@ -564,8 +566,8 @@ func TestRunPipeWrap(t *testing.T) {
 					Replacements: map[string]string{
 						"darwin": "macOS",
 					},
-					Files: []string{
-						"README.*",
+					Files: []config.File{
+						{Source: "README.*"},
 					},
 				},
 			},
@@ -627,8 +629,8 @@ func TestDefaultSet(t *testing.T) {
 					Builds:       []string{"default"},
 					NameTemplate: "foo",
 					Format:       "zip",
-					Files: []string{
-						"foo",
+					Files: []config.File{
+						{Source: "foo"},
 					},
 				},
 			},
@@ -637,7 +639,7 @@ func TestDefaultSet(t *testing.T) {
 	require.NoError(t, Pipe{}.Default(ctx))
 	require.Equal(t, "foo", ctx.Config.Archives[0].NameTemplate)
 	require.Equal(t, "zip", ctx.Config.Archives[0].Format)
-	require.Equal(t, "foo", ctx.Config.Archives[0].Files[0])
+	require.Equal(t, config.File{Source: "foo"}, ctx.Config.Archives[0].Files[0])
 }
 
 func TestDefaultFormatBinary(t *testing.T) {
@@ -700,8 +702,8 @@ func TestBinaryOverride(t *testing.T) {
 						{
 							Builds:       []string{"default"},
 							NameTemplate: defaultNameTemplate,
-							Files: []string{
-								"README.*",
+							Files: []config.File{
+								{Source: "README.*"},
 							},
 							FormatOverrides: []config.FormatOverride{
 								{
@@ -775,9 +777,9 @@ func TestRunPipeSameArchiveFilename(t *testing.T) {
 				{
 					Builds:       []string{"default"},
 					NameTemplate: "same-filename",
-					Files: []string{
-						"README.*",
-						"./foo/**/*",
+					Files: []config.File{
+						{Source: "README.*"},
+						{Source: "./foo/**/*"},
 					},
 					Format: "tar.gz",
 				},
@@ -832,8 +834,14 @@ func TestDuplicateFilesInsideArchive(t *testing.T) {
 		require.NoError(t, a.Close())
 	})
 
-	require.NoError(t, a.Add("foo", ff.Name()))
-	require.EqualError(t, a.Add("foo", ff.Name()), "file foo already exists in the archive")
+	require.NoError(t, a.Add(config.File{
+		Source:      ff.Name(),
+		Destination: "foo",
+	}))
+	require.EqualError(t, a.Add(config.File{
+		Source:      ff.Name(),
+		Destination: "foo",
+	}), "file foo already exists in the archive")
 }
 
 func TestWrapInDirectory(t *testing.T) {
@@ -869,4 +877,209 @@ func TestSeveralArchivesWithTheSameID(t *testing.T) {
 		},
 	}
 	require.EqualError(t, Pipe{}.Default(ctx), "found 2 archives with the ID 'a', please fix your config")
+}
+
+func TestFindFiles(t *testing.T) {
+	now := time.Now().Truncate(time.Second)
+	tmpl := tmpl.New(context.New(config.Project{}))
+
+	t.Run("single file", func(t *testing.T) {
+		result, err := findFiles(tmpl, []config.File{
+			{
+				Source:      "./testdata/**/d.txt",
+				Destination: "var/foobar/d.txt",
+			},
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, []config.File{
+			{
+				Source:      "testdata/a/b/c/d.txt",
+				Destination: "var/foobar/d.txt/testdata/a/b/c/d.txt",
+			},
+		}, result)
+	})
+
+	t.Run("match multiple files within tree without destination", func(t *testing.T) {
+		result, err := findFiles(tmpl, []config.File{{Source: "./testdata/a"}})
+
+		require.NoError(t, err)
+		require.Equal(t, []config.File{
+			{Source: "testdata/a/a.txt", Destination: "testdata/a/a.txt"},
+			{Source: "testdata/a/b/a.txt", Destination: "testdata/a/b/a.txt"},
+			{Source: "testdata/a/b/c/d.txt", Destination: "testdata/a/b/c/d.txt"},
+		}, result)
+	})
+
+	t.Run("match multiple files within tree specific destination", func(t *testing.T) {
+		result, err := findFiles(tmpl, []config.File{
+			{
+				Source:      "./testdata/a",
+				Destination: "usr/local/test",
+				Info: config.FileInfo{
+					Owner: "carlos",
+					Group: "users",
+					Mode:  0755,
+					MTime: now,
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, []config.File{
+			{
+				Source:      "testdata/a/a.txt",
+				Destination: "usr/local/test/testdata/a/a.txt",
+				Info: config.FileInfo{
+					Owner: "carlos",
+					Group: "users",
+					Mode:  0755,
+					MTime: now,
+				},
+			},
+			{
+				Source:      "testdata/a/b/a.txt",
+				Destination: "usr/local/test/testdata/a/b/a.txt",
+				Info: config.FileInfo{
+					Owner: "carlos",
+					Group: "users",
+					Mode:  0755,
+					MTime: now,
+				},
+			},
+			{
+				Source:      "testdata/a/b/c/d.txt",
+				Destination: "usr/local/test/testdata/a/b/c/d.txt",
+				Info: config.FileInfo{
+					Owner: "carlos",
+					Group: "users",
+					Mode:  0755,
+					MTime: now,
+				},
+			},
+		}, result)
+	})
+
+	t.Run("match multiple files within tree specific destination stripping parents", func(t *testing.T) {
+		result, err := findFiles(tmpl, []config.File{
+			{
+				Source:      "./testdata/a",
+				Destination: "usr/local/test",
+				StripParent: true,
+				Info: config.FileInfo{
+					Owner: "carlos",
+					Group: "users",
+					Mode:  0755,
+					MTime: now,
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, []config.File{
+			{
+				Source:      "testdata/a/a.txt",
+				Destination: "usr/local/test/a.txt",
+				Info: config.FileInfo{
+					Owner: "carlos",
+					Group: "users",
+					Mode:  0755,
+					MTime: now,
+				},
+			},
+			{
+				Source:      "testdata/a/b/c/d.txt",
+				Destination: "usr/local/test/d.txt",
+				Info: config.FileInfo{
+					Owner: "carlos",
+					Group: "users",
+					Mode:  0755,
+					MTime: now,
+				},
+			},
+		}, result)
+	})
+}
+
+func TestArchive_globbing(t *testing.T) {
+	assertGlob := func(t *testing.T, files []config.File, expected []string) {
+		t.Helper()
+		bin, err := ioutil.TempFile(t.TempDir(), "binary")
+		require.NoError(t, err)
+		dist := t.TempDir()
+		ctx := context.New(config.Project{
+			Dist: dist,
+			Archives: []config.Archive{
+				{
+					Builds:       []string{"default"},
+					Format:       "tar.gz",
+					NameTemplate: "foo",
+					Files:        files,
+				},
+			},
+		})
+
+		ctx.Artifacts.Add(&artifact.Artifact{
+			Goos:   "darwin",
+			Goarch: "amd64",
+			Name:   "foobin",
+			Path:   bin.Name(),
+			Type:   artifact.Binary,
+			Extra: map[string]interface{}{
+				"ID": "default",
+			},
+		})
+
+		require.NoError(t, Pipe{}.Run(ctx))
+		require.Equal(t, append(expected, "foobin"), tarFiles(t, filepath.Join(dist, "foo.tar.gz")))
+	}
+
+	t.Run("exact src file", func(t *testing.T) {
+		assertGlob(t, []config.File{{Source: "testdata/a/a.txt"}}, []string{"testdata/a/a.txt"})
+	})
+
+	t.Run("exact src file with dst", func(t *testing.T) {
+		assertGlob(t, []config.File{
+			{
+				Source:      "testdata/a/a.txt",
+				Destination: "foo/",
+			},
+		}, []string{"foo/testdata/a/a.txt"})
+	})
+
+	t.Run("glob src", func(t *testing.T) {
+		assertGlob(t, []config.File{
+			{Source: "testdata/**/*.txt"},
+		}, []string{
+			"testdata/a/a.txt",
+			"testdata/a/b/a.txt",
+			"testdata/a/b/c/d.txt",
+		})
+	})
+
+	t.Run("glob src with dst", func(t *testing.T) {
+		assertGlob(t, []config.File{
+			{
+				Source:      "testdata/**/*.txt",
+				Destination: "var/yada",
+			},
+		}, []string{
+			"var/yada/testdata/a/a.txt",
+			"var/yada/testdata/a/b/a.txt",
+			"var/yada/testdata/a/b/c/d.txt",
+		})
+	})
+
+	t.Run("glob src with dst stripping parent", func(t *testing.T) {
+		assertGlob(t, []config.File{
+			{
+				Source:      "testdata/**/*.txt",
+				Destination: "var/yada",
+				StripParent: true,
+			},
+		}, []string{
+			"var/yada/a.txt",
+			"var/yada/d.txt",
+		})
+	})
 }

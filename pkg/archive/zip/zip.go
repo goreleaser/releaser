@@ -7,6 +7,8 @@ import (
 	"compress/flate"
 	"io"
 	"os"
+
+	"github.com/goreleaser/goreleaser/pkg/config"
 )
 
 // Archive zip struct.
@@ -31,25 +33,31 @@ func New(target io.Writer) Archive {
 }
 
 // Add a file to the zip archive.
-func (a Archive) Add(name, path string) (err error) {
-	file, err := os.Open(path) // #nosec
+func (a Archive) Add(f config.File) error {
+	file, err := os.Open(f.Source) // #nosec
 	if err != nil {
-		return
+		return err
 	}
 	defer file.Close()
 	info, err := file.Stat()
 	if err != nil {
-		return
+		return err
 	}
 	if info.IsDir() {
-		return
+		return err
 	}
 	header, err := zip.FileInfoHeader(info)
 	if err != nil {
 		return err
 	}
-	header.Name = name
+	header.Name = f.Destination
 	header.Method = zip.Deflate
+	if !f.Info.MTime.IsZero() {
+		header.Modified = f.Info.MTime
+	}
+	if f.Info.Mode != 0 {
+		header.SetMode(f.Info.Mode)
+	}
 	w, err := a.z.CreateHeader(header)
 	if err != nil {
 		return err
@@ -57,3 +65,5 @@ func (a Archive) Add(name, path string) (err error) {
 	_, err = io.Copy(w, file)
 	return err
 }
+
+// TODO: test fileinfo stuff

@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/goreleaser/goreleaser/pkg/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,8 +25,14 @@ func TestArchive(t *testing.T) {
 				require.NoError(t, archive.Close())
 				require.NoError(t, file.Close())
 			})
-			require.NoError(t, archive.Add("empty.txt", empty.Name()))
-			require.Error(t, archive.Add("dont.txt", empty.Name()+"_nope"))
+			require.NoError(t, archive.Add(config.File{
+				Source:      empty.Name(),
+				Destination: "empty.txt",
+			}))
+			require.Error(t, archive.Add(config.File{
+				Source:      empty.Name() + "_nope",
+				Destination: "dont.txt",
+			}))
 		})
 	}
 }

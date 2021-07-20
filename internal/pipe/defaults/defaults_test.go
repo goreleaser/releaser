@@ -61,8 +61,8 @@ func TestFillPartial(t *testing.T) {
 			},
 			Archives: []config.Archive{
 				{
-					Files: []string{
-						"glob/*",
+					Files: []config.File{
+						{Source: "glob/*"},
 					},
 				},
 			},
